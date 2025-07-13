@@ -1,0 +1,31 @@
+services:
+  cursor-benchmark:
+    # Cursor AppImage is now copied from the project root during build
+    build:
+      context: .
+    container_name: cursor-benchmark
+    volumes:
+      # Mount results and logs back to host
+      - ./reports:/home/testuser/cursor-benchmark/reports
+      - ./screenshots:/home/testuser/cursor-benchmark/screenshots
+      - ./logs:/home/testuser/cursor-benchmark/logs
+    environment:
+      - DISPLAY=:99
+      - CURSOR_PATH=/home/testuser/Applications/cursor.AppImage
+      - CONTAINER=true
+    # Allocate a pseudo-TTY for better output
+    tty: true
+    # Keep STDIN open
+    stdin_open: true
+    # Set shared memory size for browser-like apps
+    shm_size: 2gb
+    # Security options for AppImage execution
+    security_opt:
+      - seccomp:unconfined
+    # Privileged mode may be needed for some automation features
+    privileged: false
+    # Network mode
+    network_mode: "bridge"
+    # Mount tmpfs for X11 sockets (better performance and isolation)
+    tmpfs:
+      - /tmp/.X11-unix:rw,noexec,nosuid,size=100m

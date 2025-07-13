@@ -1,0 +1,54 @@
+# Exclude host-specific directories and files
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Git and version control
+.git/
+.gitignore
+*.git*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Logs and temporary files
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# Runtime directories
+reports/
+screenshots/
+benchmark_results.json
+memory_benchmark.json
+file_operations_benchmark.json
+
+# Documentation
+README.md
+*.md
+
+# Docker files (not needed inside container)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Host-specific scripts
+run-tests-docker.sh
