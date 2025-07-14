@@ -1,8 +1,14 @@
-# Cursor AppImage Testing Framework
-__version__ = "1.0.0"
-__author__ = "Imamuzzaki Abu Salam"
-__email__ = "imamuzzaki@gmail.com"
+"""
+IDE AI Benchmark - Multi-IDE AI model benchmarking framework
+"""
 
-from .cursor_automation import CursorAutomation
+from .ide_automation import (CursorAutomation, IDEAutomation, VSCodeAutomation,
+                             WindsurfAutomation, create_ide_automation)
 
-__all__ = ["CursorAutomation"]
+__all__ = [
+    "IDEAutomation",
+    "CursorAutomation",
+    "WindsurfAutomation",
+    "VSCodeAutomation",
+    "create_ide_automation",
+]

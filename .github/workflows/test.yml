@@ -1,197 +1,349 @@
-name: Cursor AppImage Tests
+name: Multi-IDE AI Model Benchmark
 
 on:
   push:
-    branches: [main, develop]
+    branches: [ main, develop ]
   pull_request:
-    branches: [main, develop]
+    branches: [ main ]
   schedule:
-    # Run tests daily at 2 AM UTC
-    - cron: "0 2 * * *"
+    # Run daily benchmarks at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      ide:
+        description: 'IDE to test (cursor, windsurf, vscode, all)'
+        required: false
+        default: 'cursor'
+      test_type:
+        description: 'Type of test to run'
+        required: false
+        default: 'quick'
+        type: choice
+        options:
+        - quick
+        - comprehensive
+        - cross-ide
+        - performance
+        - ai-models
 
 jobs:
-  test:
+  setup:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      should_run_cross_ide: ${{ steps.set-matrix.outputs.should_run_cross_ide }}
+    steps:
+      - name: Set test matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.test_type }}" = "comprehensive" ]; then
+            # Full matrix for scheduled runs and comprehensive tests
+            echo 'matrix={"ide": ["cursor", "vscode"], "python-version": ["3.13"], "os": ["ubuntu-latest"]}' >> $GITHUB_OUTPUT
+            echo 'should_run_cross_ide=true' >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.ide }}" = "all" ]; then
+            # All IDEs for manual dispatch
+            echo 'matrix={"ide": ["cursor", "vscode"], "python-version": ["3.13"], "os": ["ubuntu-latest"]}' >> $GITHUB_OUTPUT
+            echo 'should_run_cross_ide=true' >> $GITHUB_OUTPUT
+          else
+            # Single IDE for regular pushes and PRs
+            IDE="${{ github.event.inputs.ide || 'cursor' }}"
+            echo "matrix={\"ide\": [\"$IDE\"], \"python-version\": [\"3.13\"], \"os\": [\"ubuntu-latest\"]}" >> $GITHUB_OUTPUT
+            echo 'should_run_cross_ide=false' >> $GITHUB_OUTPUT
+          fi
 
+  test-ides:
+    needs: setup
+    runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        python-version: [3.11, 3.12, 3.13]
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            xvfb \
-            x11-utils \
-            xdotool \
-            scrot \
-            python3-tk \
-            python3-dev \
-            libxtst6 \
-            libxss1 \
-            libgconf-2-4 \
-            libasound2 \
-            libgtk-3-0 \
-            libdrm2 \
-            libxss1 \
-            libgconf-2-4
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          xvfb \
+          x11-utils \
+          xdotool \
+          scrot \
+          wmctrl \
+          python3-tk \
+          python3-dev \
+          libxtst6 \
+          libxss1 \
+          libgtk-3-0 \
+          libgconf-2-4 \
+          libasound2 \
+          libatk-bridge2.0-0 \
+          libdrm2 \
+          libxkbcommon0 \
+          libxcomposite1 \
+          libxdamage1 \
+          libxrandr2 \
+          libgbm1
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest-html pytest-cov
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
 
-      - name: Download Cursor AppImage (if not cached)
-        run: |
-          # Create a mock AppImage for testing in CI
-          # TODO: In real usage, you would download or use the actual Cursor AppImage
-          mkdir -p /tmp/cursor
-          echo '#!/bin/bash' > /tmp/cursor/cursor.AppImage
-          echo 'echo "Mock Cursor AppImage"' >> /tmp/cursor/cursor.AppImage
-          echo 'sleep 30' >> /tmp/cursor/cursor.AppImage
-          chmod +x /tmp/cursor/cursor.AppImage
+    - name: Install Python dependencies
+      run: |
+        uv sync --extra test
 
-          # Create config to use the mock AppImage
-          mkdir -p config
-          echo "CURSOR_PATH=/tmp/cursor/cursor.AppImage" > config/test.env
+    - name: Setup IDE - Cursor
+      if: matrix.ide == 'cursor'
+      run: |
+        # Download Cursor AppImage
+        wget -O cursor.AppImage "https://download.cursor.sh/linux/appImage/x64"
+        chmod +x cursor.AppImage
+        echo "CURSOR_PATH=$PWD/cursor.AppImage" >> $GITHUB_ENV
 
-      - name: Create test directories
-        run: |
-          mkdir -p reports
-          mkdir -p screenshots
-          mkdir -p test_images
+    - name: Setup IDE - VSCode
+      if: matrix.ide == 'vscode'
+      run: |
+        # Install VSCode
+        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+        sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
+        sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
+        sudo apt-get update
+        sudo apt-get install -y code
+        echo "VSCODE_PATH=/usr/bin/code" >> $GITHUB_ENV
 
-      - name: Run basic tests
-        run: |
-          xvfb-run -a --server-args="-screen 0 1920x1080x24 -ac +extension GLX" \
-            python -m pytest tests/test_basic_functionality.py -v \
-            --junitxml=reports/basic-junit.xml \
-            --html=reports/basic-report.html
-        env:
-          DISPLAY: :99
-          CURSOR_PATH: /tmp/cursor/cursor.AppImage
+    - name: Setup IDE - Windsurf
+      if: matrix.ide == 'windsurf'
+      run: |
+        # Note: Windsurf setup would go here when available
+        echo "WINDSURF_PATH=./windsurf.AppImage" >> $GITHUB_ENV
 
-      - name: Run performance benchmarks
-        run: |
-          xvfb-run -a --server-args="-screen 0 1920x1080x24 -ac +extension GLX" \
-            python -m pytest tests/test_performance_benchmarks.py -v \
-            --junitxml=reports/performance-junit.xml \
-            --html=reports/performance-report.html
-        env:
-          DISPLAY: :99
-          CURSOR_PATH: /tmp/cursor/cursor.AppImage
+    - name: Create results directories
+      run: |
+        mkdir -p results reports screenshots logs
 
-      - name: Run workflow tests (if not slow)
-        run: |
-          xvfb-run -a --server-args="-screen 0 1920x1080x24 -ac +extension GLX" \
-            python -m pytest tests/test_user_workflows.py -v \
-            -m "not slow" \
-            --junitxml=reports/workflow-junit.xml \
-            --html=reports/workflow-report.html
-        env:
-          DISPLAY: :99
-          CURSOR_PATH: /tmp/cursor/cursor.AppImage
+    - name: Run IDE-specific tests
+      env:
+        DISPLAY: :99
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Start Xvfb
+        Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX &
+        sleep 3
 
-      - name: Generate coverage report
-        run: |
-          pip install coverage
-          coverage run -m pytest tests/ -m "not slow"
-          coverage xml
-          coverage html
-        env:
-          DISPLAY: :99
-          CURSOR_PATH: /tmp/cursor/cursor.AppImage
+        # Determine test type
+        TEST_TYPE="${{ github.event.inputs.test_type || 'quick' }}"
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: test-results-${{ matrix.python-version }}
-          path: |
-            reports/
-            screenshots/
-            htmlcov/
-            *.json
+        # Run tests based on type
+        case $TEST_TYPE in
+          "quick")
+            uv run python scripts/run_tests.py --ide ${{ matrix.ide }} --quick --headless
+            ;;
+          "comprehensive")
+            uv run python scripts/run_tests.py --ide ${{ matrix.ide }} --comprehensive --headless
+            ;;
+          "performance")
+            uv run python scripts/run_tests.py --ide ${{ matrix.ide }} --performance --headless
+            ;;
+          "ai-models")
+            uv run python scripts/run_tests.py --ide ${{ matrix.ide }} --ai-models --headless
+            ;;
+          *)
+            uv run python scripts/run_tests.py --ide ${{ matrix.ide }} --basic --headless
+            ;;
+        esac
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.ide }}-${{ matrix.python-version }}
+        path: |
+          reports/
+          results/
+          screenshots/
+          logs/
+        retention-days: 30
 
-  benchmark:
+    - name: Upload coverage to Codecov
+      if: matrix.ide == 'cursor'  # Only upload coverage once
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./reports/coverage.xml
+        fail_ci_if_error: false
+
+  cross-ide-comparison:
+    needs: [setup, test-ides]
+    if: needs.setup.outputs.should_run_cross_ide == 'true'
     runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main'
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb x11-utils xdotool scrot
-          pip install -r requirements.txt
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          xvfb x11-utils xdotool scrot wmctrl \
+          python3-tk python3-dev libxtst6 libxss1 libgtk-3-0
 
-      - name: Setup mock Cursor
-        run: |
-          mkdir -p /tmp/cursor
-          echo '#!/bin/bash' > /tmp/cursor/cursor.AppImage
-          echo 'echo "Mock Cursor AppImage"' >> /tmp/cursor/cursor.AppImage
-          echo 'sleep 30' >> /tmp/cursor/cursor.AppImage
-          chmod +x /tmp/cursor/cursor.AppImage
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
 
-      - name: Run full benchmark suite
-        run: |
-          xvfb-run -a --server-args="-screen 0 1920x1080x24 -ac +extension GLX" \
-            python -m pytest tests/test_performance_benchmarks.py -v
-        env:
-          DISPLAY: :99
-          CURSOR_PATH: /tmp/cursor/cursor.AppImage
+    - name: Install Python dependencies
+      run: |
+        uv sync --extra test
 
-      - name: Store benchmark results
-        uses: actions/upload-artifact@v3
-        with:
-          name: benchmark-results
-          path: |
-            *.json
-            screenshots/
+    - name: Setup multiple IDEs
+      run: |
+        # Download Cursor
+        wget -O cursor.AppImage "https://download.cursor.sh/linux/appImage/x64"
+        chmod +x cursor.AppImage
+        echo "CURSOR_PATH=$PWD/cursor.AppImage" >> $GITHUB_ENV
 
-      - name: Comment PR with benchmark results
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            if (fs.existsSync('benchmark_results.json')) {
-              const results = JSON.parse(fs.readFileSync('benchmark_results.json', 'utf8'));
-              const comment = `## 🚀 Benchmark Results
+        # Install VSCode
+        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+        sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
+        sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
+        sudo apt-get update
+        sudo apt-get install -y code
+        echo "VSCODE_PATH=/usr/bin/code" >> $GITHUB_ENV
 
-              **Startup Time:** ${results.average.toFixed(2)}s (average)
-              **Median:** ${results.median.toFixed(2)}s
+    - name: Run cross-IDE comparison tests
+      env:
+        DISPLAY: :99
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      run: |
+        # Start Xvfb
+        Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX &
+        sleep 3
 
-              *Full results uploaded as artifacts*`;
+        # Run cross-IDE comparison
+        uv run python scripts/run_tests.py --cross-ide --all-ides --headless
 
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-            }
+    - name: Generate comparison report
+      run: |
+        uv run python scripts/generate_reports.py --cross-ide-analysis
+
+    - name: Upload cross-IDE results
+      uses: actions/upload-artifact@v4
+      with:
+        name: cross-ide-comparison-results
+        path: |
+          reports/cross-ide-comparison.html
+          reports/comparison_summary.json
+          results/
+        retention-days: 30
+
+  benchmark-performance:
+    needs: setup
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install -y xvfb x11-utils python3-tk
+        pip install uv
+        uv sync --extra test
+
+    - name: Setup IDEs for performance testing
+      run: |
+        wget -O cursor.AppImage "https://download.cursor.sh/linux/appImage/x64"
+        chmod +x cursor.AppImage
+        echo "CURSOR_PATH=$PWD/cursor.AppImage" >> $GITHUB_ENV
+
+    - name: Run performance benchmarks
+      env:
+        DISPLAY: :99
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        Xvfb :99 -screen 0 1920x1080x24 &
+        sleep 3
+        uv run python scripts/run_tests.py --performance --all-ides --headless
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-benchmark-results
+        path: |
+          results/performance_comparison.json
+          reports/performance-*.html
+        retention-days: 90
+
+  publish-results:
+    needs: [test-ides, cross-ide-comparison]
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Publish results to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./reports
+        destination_dir: benchmark-results/${{ github.run_number }}
+
+    - name: Create release with results
+      if: github.event_name == 'schedule'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: benchmark-${{ github.run_number }}
+        name: Daily Benchmark Results ${{ github.run_number }}
+        body: |
+          Automated daily benchmark results for IDE AI model comparison.
+
+          **Test Results:**
+          - Date: ${{ github.run_number }}
+          - Commit: ${{ github.sha }}
+          - IDEs tested: Cursor, VSCode
+          - Models tested: Claude 3.5 Sonnet, GPT-4, GitHub Copilot
+        files: |
+          reports/**/*
+          results/**/*
+        prerelease: true
+
+  notify:
+    needs: [test-ides, cross-ide-comparison]
+    if: failure() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Notify on failure
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#dev-alerts'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      if: always()

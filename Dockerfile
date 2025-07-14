@@ -1,221 +1,177 @@
-FROM ubuntu:24.04
+# Multi-IDE AI Model Benchmark Framework
+# Supports testing across Cursor, Windsurf, VSCode, and other IDEs
 
-# Avoid prompts from apt
-ENV DEBIAN_FRONTEND=noninteractive
+FROM python:3.13-slim
 
-# Add deadsnakes PPA for Python 3.13
-RUN apt-get update && apt-get install -y software-properties-common && \
-  add-apt-repository ppa:deadsnakes/ppa && \
-  apt-get update
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    # X11 and GUI support
+    xvfb \
+    x11-utils \
+    xdotool \
+    scrot \
+    wmctrl \
+    # Python GUI dependencies
+    python3-tk \
+    python3-dev \
+    # X11 libraries
+    libxtst6 \
+    libxss1 \
+    libgtk-3-0 \
+    libgconf-2-4 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libxss1 \
+    libasound2 \
+    # Additional dependencies for IDEs
+    libgtk-3-0 \
+    libgbm-dev \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    # Build tools
+    build-essential \
+    wget \
+    curl \
+    unzip \
+    # Process management
+    procps \
+    psmisc \
+    # Networking
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install system dependencies including OpenCV requirements
-RUN apt-get install -y \
-  python3.13 \
-  python3.13-dev \
-  python3.13-venv \
-  python3.13-tk \
-  python3-pip \
-  curl \
-  wget \
-  xvfb \
-  x11vnc \
-  x11-utils \
-  fluxbox \
-  wmctrl \
-  xdotool \
-  imagemagick \
-  fonts-liberation \
-  libnss3-dev \
-  libatk-bridge2.0-0 \
-  libdrm2 \
-  libxkbcommon0 \
-  libgtk-3-0 \
-  libxss1 \
-  libasound2t64 \
-  libxtst6 \
-  libxrandr2 \
-  python3-dev \
-  python3-setuptools \
-  libx11-dev \
-  libxinerama1 \
-  libxcursor1 \
-  libxi6 \
-  libglib2.0-0 \
-  libsm6 \
-  libxext6 \
-  libxrender-dev \
-  libgoogle-glog-dev \
-  libgflags-dev \
-  libatlas-base-dev \
-  libhdf5-103-1t64 \
-  libhdf5-dev \
-  libavcodec-dev \
-  libavformat-dev \
-  libswscale-dev \
-  libgstreamer1.0-dev \
-  libgstreamer-plugins-base1.0-dev \
-  libjpeg-dev \
-  libpng-dev \
-  libtiff-dev \
-  libwebp-dev \
-  libopenexr-dev \
-  libopenblas-dev && \
-  rm -rf /var/lib/apt/lists/*
+# Set working directory
+WORKDIR /app
 
-# Create a non-root user
-RUN useradd -m -s /bin/bash testuser
-USER testuser
-WORKDIR /home/testuser
+# Create test user with proper permissions
+RUN useradd -m -s /bin/bash testuser && \
+    usermod -aG sudo testuser && \
+    echo 'testuser ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Set up virtual environment
-RUN python3.13 -m venv venv
-ENV PATH="/home/testuser/venv/bin:$PATH"
+# Copy requirements and install Python dependencies
+COPY pyproject.toml uv.lock* ./
+RUN pip install uv && \
+    uv sync --extra test
 
-# Install uv for faster package management
-RUN pip install uv
-
-# Copy project files
-COPY --chown=testuser:testuser . /home/testuser/cursor-benchmark/
-WORKDIR /home/testuser/cursor-benchmark
-
-# Create Applications directory first
-RUN mkdir -p /home/testuser/Applications
-
-# Copy local cursor.AppImage if it exists, otherwise download it
-RUN if [ -f "./cursor.AppImage" ]; then \
-        echo "Using local cursor.AppImage from project root"; \
-        cp ./cursor.AppImage /home/testuser/Applications/cursor.AppImage; \
-        chmod +x /home/testuser/Applications/cursor.AppImage; \
-    else \
-        echo "No local cursor.AppImage found, downloading..."; \
-        wget -O /home/testuser/Applications/cursor.AppImage \
-            "https://www.cursor.com/download/stable/linux-x64" && \
-        chmod +x /home/testuser/Applications/cursor.AppImage; \
-    fi
-
-# Extract AppImage since FUSE is not available in containers
-RUN cd /home/testuser/Applications && \
-    ./cursor.AppImage --appimage-extract && \
-    mv squashfs-root cursor-extracted && \
-    ln -sf /home/testuser/Applications/cursor-extracted/cursor /home/testuser/Applications/cursor && \
-    echo "AppImage extracted successfully"
-
-# Install Python dependencies
-RUN uv sync --extra test
-
-# Update PATH to use the project's .venv created by uv
-ENV PATH="/home/testuser/cursor-benchmark/.venv/bin:$PATH"
-
-# Create Applications directory
-RUN mkdir -p /home/testuser/Applications
-
-# Note: Cursor AppImage will be mounted at runtime via docker-compose volumes
-
-# Set up display environment
+# Set up environment variables
 ENV DISPLAY=:99
-ENV XAUTHORITY=/home/testuser/.Xauthority
+ENV PYTHONPATH=/app/src
+ENV QT_X11_NO_MITSHM=1
+ENV XDG_RUNTIME_DIR=/tmp/runtime-testuser
+ENV CONTAINER=true
 
-# Create X11 socket directory and set permissions
-USER root
-RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+# Create necessary directories
+RUN mkdir -p /app/screenshots /app/test_images /app/reports /app/results /app/logs && \
+    mkdir -p /tmp/runtime-testuser && \
+    chown -R testuser:testuser /app /tmp/runtime-testuser
+
+# Copy source code
+COPY --chown=testuser:testuser . .
+
+# Switch to test user
 USER testuser
 
-# Create startup script with better X11 handling
+# Create Xvfb startup script
 RUN echo '#!/bin/bash\n\
-set -e\n\
+# Start Xvfb\n\
+Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX &\n\
+XVFB_PID=$!\n\
+echo "Started Xvfb with PID: $XVFB_PID"\n\
 \n\
-# Function to cleanup processes\n\
+# Wait for display to be ready\n\
+sleep 3\n\
+\n\
+# Export display\n\
+export DISPLAY=:99\n\
+\n\
+# Function to cleanup on exit\n\
 cleanup() {\n\
-    echo "Cleaning up processes..."\n\
-    if [ ! -z "$WM_PID" ]; then\n\
-        echo "Terminating window manager..."\n\
-        kill -TERM $WM_PID 2>/dev/null || true\n\
-        sleep 2\n\
-        kill -KILL $WM_PID 2>/dev/null || true\n\
-    fi\n\
-    if [ ! -z "$XVFB_PID" ]; then\n\
-        echo "Terminating Xvfb..."\n\
-        kill -TERM $XVFB_PID 2>/dev/null || true\n\
-        sleep 2\n\
-        kill -KILL $XVFB_PID 2>/dev/null || true\n\
-    fi\n\
-    echo "Cleanup complete"\n\
+    echo "Cleaning up..."\n\
+    # Kill any running IDE processes\n\
+    pkill -f "cursor\\|windsurf\\|code" || true\n\
+    # Kill Xvfb\n\
+    kill $XVFB_PID 2>/dev/null || true\n\
+    exit 0\n\
 }\n\
 \n\
 # Set up signal handlers\n\
-trap cleanup EXIT INT TERM\n\
+trap cleanup SIGTERM SIGINT\n\
 \n\
-# Create X11 auth file\n\
-touch $XAUTHORITY\n\
-\n\
-# Start Xvfb with better error handling\n\
-echo "Starting Xvfb..."\n\
-Xvfb $DISPLAY -screen 0 1920x1080x24 -ac +extension GLX +render -noreset -dpi 96 &\n\
-XVFB_PID=$!\n\
-\n\
-# Wait for X server to be ready\n\
-echo "Waiting for X server to start..."\n\
-for i in {1..30}; do\n\
-    if xdpyinfo -display $DISPLAY >/dev/null 2>&1; then\n\
-        echo "X server is ready"\n\
-        break\n\
-    fi\n\
-    if [ $i -eq 30 ]; then\n\
-        echo "X server failed to start within 30 seconds"\n\
-        exit 1\n\
-    fi\n\
-    sleep 1\n\
-done\n\
-\n\
-# Start window manager\n\
-echo "Starting window manager..."\n\
-fluxbox -display $DISPLAY &\n\
-WM_PID=$!\n\
-\n\
-# Wait for WM to be ready\n\
-sleep 3\n\
-\n\
-# Verify WM is running\n\
-if ! wmctrl -m >/dev/null 2>&1; then\n\
-    echo "Warning: Window manager may not be running properly"\n\
-fi\n\
-\n\
-echo "Display environment ready"\n\
-echo "Running command: $@"\n\
-\n\
-# Run the command passed as arguments\n\
-"$@"\n\
-EXIT_CODE=$?\n\
-\n\
-echo "Command finished with exit code: $EXIT_CODE"\n\
-\n\
-exit $EXIT_CODE\n\
-' >/home/testuser/run-with-display.sh && chmod +x /home/testuser/run-with-display.sh
+# Execute the main command\n\
+exec "$@"\n\
+' > /app/docker-entrypoint.sh && \
+    chmod +x /app/docker-entrypoint.sh
 
-# Create test runner script that uses the copied Cursor AppImage
+# Health check script
 RUN echo '#!/bin/bash\n\
-echo "=== STARTING CURSOR AUTOMATION TESTS IN CONTAINER ==="\n\
-echo "Container Display: $DISPLAY"\n\
+# Check if Xvfb is running\n\
+pgrep Xvfb > /dev/null || exit 1\n\
 \n\
-# Verify Cursor AppImage is available\n\
-if [ -f "/home/testuser/Applications/cursor.AppImage" ]; then\n\
-    echo "Using Cursor AppImage from container"\n\
-    ls -la /home/testuser/Applications/cursor.AppImage\n\
-else\n\
-    echo "ERROR: Cursor AppImage not found in container"\n\
-    exit 1\n\
-fi\n\
+# Check if display is working\n\
+DISPLAY=:99 xdpyinfo > /dev/null 2>&1 || exit 1\n\
 \n\
-echo "Cursor AppImage: /home/testuser/Applications/cursor.AppImage"\n\
-echo ""\n\
+# Check if Python environment is working\n\
+python -c "import sys; sys.path.insert(0, \"/app/src\"); from ide_automation import create_ide_automation" || exit 1\n\
 \n\
-# Update config to use container paths\n\
-export CURSOR_PATH="/home/testuser/Applications/cursor.AppImage"\n\
-\n\
-# Run tests with virtual display\n\
-echo "=== RUNNING TESTS ==="\n\
-exec /home/testuser/run-with-display.sh python scripts/run_tests.py "$@"\n\
-' >/home/testuser/run-tests.sh && chmod +x /home/testuser/run-tests.sh
+echo "Health check passed"\n\
+exit 0\n\
+' > /app/healthcheck.sh && \
+    chmod +x /app/healthcheck.sh
 
-# Default command
-CMD ["/home/testuser/run-tests.sh", "--quick"]
+# Expose any necessary ports (none needed for this application)
+# EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD /app/healthcheck.sh
+
+# Volume for IDE applications (mount your IDEs here)
+VOLUME ["/app/ides"]
+
+# Volume for test results
+VOLUME ["/app/results", "/app/reports", "/app/screenshots"]
+
+# Default command - run quick benchmark
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["python", "scripts/run_tests.py", "--quick", "--headless"]
+
+# Usage Examples:
+#
+# Build:
+# docker build -t ide-ai-benchmark .
+#
+# Run with Cursor IDE:
+# docker run -v /path/to/cursor.AppImage:/app/ides/cursor.AppImage \
+#            -v /path/to/results:/app/results \
+#            -e CURSOR_PATH=/app/ides/cursor.AppImage \
+#            -e ANTHROPIC_API_KEY=your_key \
+#            ide-ai-benchmark
+#
+# Run cross-IDE comparison:
+# docker run -v /path/to/ides:/app/ides \
+#            -v /path/to/results:/app/results \
+#            -e CURSOR_PATH=/app/ides/cursor.AppImage \
+#            -e WINDSURF_PATH=/app/ides/windsurf.AppImage \
+#            -e VSCODE_PATH=/usr/bin/code \
+#            -e ANTHROPIC_API_KEY=your_key \
+#            -e OPENAI_API_KEY=your_key \
+#            ide-ai-benchmark python scripts/run_tests.py --cross-ide --all-ides
+#
+# Interactive mode:
+# docker run -it -v /path/to/ides:/app/ides ide-ai-benchmark bash
+#
+# Custom benchmark:
+# docker run -v /path/to/ides:/app/ides \
+#            -v /path/to/results:/app/results \
+#            ide-ai-benchmark python scripts/run_tests.py --ide cursor --performance

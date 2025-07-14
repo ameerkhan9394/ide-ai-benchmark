@@ -1,21 +1,39 @@
-# ImBIOS's Cursor Model Benchmark
+# IDE AI Benchmark
 
-A personal benchmarking framework to evaluate and compare different AI models in Cursor for various software engineering tasks and use cases.
+A comprehensive benchmarking framework to evaluate and compare different AI models (Claude, OpenAI, Gemini, etc.) across multiple IDEs and development environments (Cursor IDE, Windsurf IDE, Trae IDE, Claude Code CLI, VSCode + GitHub Copilot, etc.).
 
 ## 🚀 Features
 
-- **AI Model Comparison**: Automated testing of different AI models (Claude, GPT-4, etc.) in Cursor
-- **Software Engineering Benchmarks**: Code generation, refactoring, debugging, and documentation tasks
+- **Multi-IDE Support**: Automated testing across Cursor, Windsurf, Trae, VSCode, and more
+- **Cross-Model Comparison**: Compare Claude, OpenAI, Gemini, and other AI models
+- **Standardized Benchmarks**: Consistent testing methodology across all IDE/model combinations
 - **Performance Metrics**: Response time, code quality, accuracy, and completion rate analysis
-- **Real-world Use Cases**: Daily software engineering scenarios and workflows
-- **Automated Evaluation**: AI-powered judging system to assess model performance
-- **Comprehensive Reporting**: Detailed comparison reports with rankings and insights
+- **Real-world Scenarios**: Daily software engineering tasks and workflows
+- **Automated Evaluation**: AI-powered judging system to assess model performance objectively
+- **Comprehensive Reporting**: Detailed comparison reports with rankings and insights across IDEs
+
+## 🎯 Supported IDEs & AI Models
+
+### Supported IDEs
+- **Cursor IDE** - Claude, OpenAI, Gemini
+- **Windsurf IDE** - Claude, OpenAI, Gemini
+- **Trae IDE** - Various models
+- **Claude Code CLI** - Claude models
+- **VSCode** - GitHub Copilot, various extensions
+- **Others** - Extensible framework for adding new IDEs
+
+### Supported AI Models
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Haiku, Claude 3 Opus
+- **OpenAI**: OpenAI, OpenAI Turbo
+- **Google**: Gemini Pro, Gemini Ultra
+- **GitHub**: Copilot (OpenAI based)
+- **Others**: Extensible for new models
 
 ## 📋 Prerequisites
 
 - **Linux** (Ubuntu/Debian preferred)
 - **Python 3.13+**
-- **Cursor Editor** with AI model access (Claude, GPT-4, etc.)
+- **Target IDEs** installed and configured
 - **API Keys** for AI models you want to benchmark
 - **GUI Environment** (for interactive testing) or **Xvfb** (for headless automation)
 
@@ -24,8 +42,8 @@ A personal benchmarking framework to evaluate and compare different AI models in
 1. **Clone the repository**:
 
 ```bash
-git clone https://github.com/ImBIOS/benchmark-cursor-model.git
-cd benchmark-cursor-model
+git clone https://github.com/ImBIOS/ide-ai-benchmark.git
+cd ide-ai-benchmark
 ```
 
 2. **Set up Python environment**:
@@ -71,109 +89,152 @@ sudo apt-get install -y \
     python3.13-dev
 ```
 
-4. **Verify Cursor AppImage path**:
+4. **Install and configure IDEs**:
 
 ```bash
-ls -la $CURSOR_PATH
+# Download Cursor IDE
+wget https://download.cursor.sh/linux/appImage/x64 -O cursor.AppImage
+chmod +x cursor.AppImage
+
+# Download Windsurf IDE (example)
+# wget <windsurf-download-url> -O windsurf.AppImage
+# chmod +x windsurf.AppImage
+
+# Install VSCode with Copilot
+sudo snap install --classic code
+# Then install GitHub Copilot extension
 ```
 
-## 🧪 Running Tests
+5. **Configure API keys**:
+
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+export OPENAI_API_KEY="your-openai-key"
+export ANTHROPIC_API_KEY="your-anthropic-key"
+export GOOGLE_API_KEY="your-google-key"
+```
+
+## 🧪 Running Benchmarks
 
 ### Quick Start
 
 ```bash
-# Run all benchmarks (quick mode)
-python scripts/run_tests.py --quick
+# Run benchmarks across all IDEs and models
+python scripts/run_tests.py --all-ides --all-models
+
+# Compare specific IDE/model combinations
+python scripts/run_tests.py --ide cursor --model claude-3.5-sonnet
+python scripts/run_tests.py --ide vscode --model github-copilot
 
 # Run specific benchmark categories
-python scripts/run_tests.py --code-generation
-python scripts/run_tests.py --performance
-python scripts/run_tests.py --workflows
+python scripts/run_tests.py --code-generation --ide cursor,windsurf
+python scripts/run_tests.py --performance --model gpt-4,claude-3.5-sonnet
 
-# Compare specific models
-python scripts/run_tests.py --models claude,gpt4
+# Generate cross-IDE comparison report
+python scripts/run_tests.py --cross-ide-report
+```
 
-# Generate detailed reports
-python scripts/run_tests.py --detailed-report
+### Advanced Benchmarking
+
+```bash
+# Test specific IDE with multiple models
+python scripts/run_tests.py --ide cursor --models claude-3.5-sonnet,gpt-4,gpt-4-turbo
+
+# Run performance benchmarks only
+python scripts/run_tests.py --performance --timeout 300
+
+# Headless testing for CI/CD
+python scripts/run_tests.py --headless --quick
+
+# Custom test scenarios
+python scripts/run_tests.py --custom-scenarios scenarios/web-dev-tasks.json
 ```
 
 ### Manual Test Execution
 
 ```bash
-# Code generation benchmarks
-pytest tests/test_basic_functionality.py -v
+# Test specific IDE functionality
+pytest tests/test_ide_functionality.py::TestCursorIDE -v
+pytest tests/test_ide_functionality.py::TestWindsurfIDE -v
 
-# Performance and quality benchmarks
-pytest tests/test_performance_benchmarks.py -v
+# Cross-IDE performance comparison
+pytest tests/test_cross_ide_performance.py -v
 
-# Real-world workflow benchmarks
-pytest tests/test_user_workflows.py -v
+# AI model quality benchmarks
+pytest tests/test_ai_model_quality.py -v
 
-# All AI model benchmarks
-pytest tests/ -v
-```
-
-### Headless Testing (for CI/servers)
-
-```bash
-# Start Xvfb
-Xvfb :99 -screen 0 1920x1080x24 &
-export DISPLAY=:99
-
-# Run tests
-python scripts/run_tests.py --headless --all
+# Real-world workflow tests
+pytest tests/test_development_workflows.py -v
 ```
 
 ## 📊 Benchmark Categories
 
-### 1. Code Generation Tests (`test_basic_functionality.py`)
+### 1. Code Generation Tests (`test_code_generation.py`)
 
+Compare AI models across IDEs for:
 - Function and class creation
 - Algorithm implementation
 - Unit test generation
 - Documentation writing
-- Code completion accuracy
-- Syntax correctness validation
+- API integration code
+- Database query generation
 
-### 2. Performance & Quality Benchmarks (`test_performance_benchmarks.py`)
+### 2. Performance & Quality Benchmarks (`test_performance_quality.py`)
 
-- Response time measurement
-- Code quality assessment
+Evaluate:
+- Response time across IDE/model combinations
+- Code quality and best practices adherence
 - Memory efficiency of generated code
 - Compilation/execution success rate
-- Best practices adherence
 - Security vulnerability detection
+- Code maintainability scores
 
-### 3. Real-world Engineering Workflows (`test_user_workflows.py`)
+### 3. Cross-IDE Workflow Tests (`test_cross_ide_workflows.py`)
 
-- Bug fixing scenarios
-- Code refactoring tasks
-- Feature implementation workflows
-- API integration challenges
-- Database query optimization
-- DevOps automation scripts
-- Code review simulations
+Real-world engineering scenarios:
+- Bug fixing efficiency
+- Code refactoring quality
+- Feature implementation speed
+- Debugging assistance effectiveness
+- Code review automation
+- Project scaffolding capabilities
+
+### 4. AI Model Capabilities (`test_ai_capabilities.py`)
+
+Model-specific testing:
+- Context understanding depth
+- Multi-language programming support
+- Complex reasoning tasks
+- Code explanation quality
+- Architecture decision support
 
 ## 🏗️ Framework Architecture
 
 ```
 .
 ├── src/
-│   └── cursor_automation.py      # AI model benchmarking automation
+│   ├── __init__.py
+│   └── ide_automation.py          # Multi-IDE automation framework
 ├── tests/
-│   ├── test_basic_functionality.py
-│   ├── test_performance_benchmarks.py
-│   └── test_user_workflows.py
+│   ├── test_ide_functionality.py  # Basic IDE automation tests
+│   ├── test_code_generation.py    # Code generation benchmarks
+│   ├── test_performance_quality.py # Performance and quality tests
+│   ├── test_cross_ide_workflows.py # Cross-IDE workflow tests
+│   └── test_ai_capabilities.py    # AI model capability tests
 ├── scripts/
-│   └── run_tests.py              # Test runner script
-├── .github/workflows/
-│   └── test.yml                  # CI/CD pipeline
-├── pyproject.toml                # Project configuration
-├── uv.lock                       # Dependency lock file
-├── install.py                    # Environment setup script
-├── reports/                      # Test reports (generated)
-├── screenshots/                  # Screenshots (generated)
-└── test_images/                  # Template images (generated)
+│   ├── run_tests.py               # Multi-IDE test runner
+│   └── generate_reports.py       # Cross-IDE comparison reports
+├── config/
+│   ├── ide_configs.yml           # IDE-specific configurations
+│   └── model_configs.yml         # AI model configurations
+├── scenarios/
+│   ├── web-dev-tasks.json        # Web development scenarios
+│   ├── data-science-tasks.json   # Data science scenarios
+│   └── devops-tasks.json         # DevOps scenarios
+├── reports/                       # Generated benchmark reports
+├── screenshots/                   # IDE screenshots during tests
+└── results/                       # Raw benchmark data
 ```
 
 ## 🔧 Configuration
@@ -181,209 +242,280 @@ python scripts/run_tests.py --headless --all
 ### Environment Variables
 
 ```bash
-# Cursor application path
+# IDE Application Paths
 export CURSOR_PATH="/path/to/cursor"
+export WINDSURF_PATH="/path/to/windsurf"
+export VSCODE_PATH="/usr/bin/code"
+export TRAE_PATH="/path/to/trae"
 
-# AI model API keys
+# AI Model API Keys
 export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
+export GOOGLE_API_KEY="your-google-key"
 
 # Display for headless mode
 export DISPLAY=:99
 ```
 
-### Test Markers
+### IDE Configuration (`config/ide_configs.yml`)
 
-```bash
-# Run only fast tests
-pytest -m "not slow"
+```yaml
+cursor:
+  launch_args: ["--no-sandbox", "--disable-dev-shm-usage"]
+  models: ["claude-3.5-sonnet", "gpt-4", "gpt-4-turbo"]
+  shortcuts:
+    ai_chat: "ctrl+l"
+    command_palette: "ctrl+shift+p"
 
-# Run specific test types
-pytest -m "basic"
-pytest -m "performance"
-pytest -m "workflow"
+windsurf:
+  launch_args: ["--no-sandbox"]
+  models: ["claude-3.5-sonnet", "gpt-4", "gemini-pro"]
+  shortcuts:
+    ai_chat: "ctrl+i"
+    command_palette: "ctrl+shift+p"
+
+vscode:
+  launch_args: ["--no-sandbox"]
+  models: ["github-copilot"]
+  shortcuts:
+    copilot_chat: "ctrl+shift+i"
+    command_palette: "ctrl+shift+p"
 ```
 
-## 📈 AI Model Benchmarking
+## 📈 Cross-IDE AI Model Benchmarking
 
-The framework evaluates AI models across multiple dimensions:
+The framework provides comprehensive comparison across multiple dimensions:
 
-### Code Quality Metrics
+### Performance Metrics
 
-- Syntax correctness and compilation success
-- Code style and best practices adherence
-- Performance and efficiency of generated code
-- Security vulnerability assessment
+- **Response Time**: Time to generate code across IDE/model combinations
+- **Completion Quality**: Accuracy and usefulness of generated code
+- **Context Awareness**: How well models understand project context
+- **IDE Integration**: Smoothness of model integration within each IDE
 
-### Response Performance
+### Capability Assessment
 
-- Time to first response
-- Complete solution generation time
-- Context understanding accuracy
-- Follow-up iteration speed
+- **Code Generation**: Function, class, and algorithm creation quality
+- **Code Explanation**: Ability to explain existing code
+- **Debugging**: Bug identification and fix suggestions
+- **Refactoring**: Code improvement recommendations
+- **Testing**: Unit test generation and test-driven development
 
-### Software Engineering Capabilities
+### Cross-IDE Consistency
 
-- Problem-solving approach quality
-- Architecture and design decisions
-- Testing and debugging effectiveness
-- Documentation and comment quality
+- **Model Behavior**: How consistently models perform across different IDEs
+- **Feature Parity**: Comparison of AI features available in each IDE
+- **Workflow Efficiency**: Which IDE/model combinations work best for specific tasks
 
-## 🎯 Writing Custom Tests
+## 🎯 Writing Custom Benchmarks
 
 ### Basic Test Structure
 
 ```python
 import pytest
-from cursor_automation import CursorAutomation
+from ide_automation import create_ide_automation
 
-class TestCustom:
-    @pytest.fixture
-    def cursor_app(self):
-        app = CursorAutomation()
+class TestCustomBenchmark:
+    @pytest.fixture(params=["cursor", "windsurf", "vscode"])
+    def ide_app(self, request):
+        app = create_ide_automation(request.param)
         assert app.launch_app()
         yield app
         app.close_app()
 
-    def test_custom_functionality(self, cursor_app):
-        cursor_app.focus_window()
-        cursor_app.key_combo('ctrl', 'n')
-        cursor_app.type_text('Hello World')
-        screenshot = cursor_app.take_screenshot('custom_test.png')
-        assert os.path.exists(screenshot)
+    def test_custom_ai_functionality(self, ide_app):
+        # Test AI model switching
+        models = ide_app.get_ai_models()
+        for model in models:
+            assert ide_app.switch_ai_model(model)
+
+            # Test AI completion
+            prompt = "Write a Python function to sort a list"
+            assert ide_app.trigger_ai_completion(prompt)
+
+            response = ide_app.get_ai_response()
+            assert "def" in response  # Basic validation
 ```
 
-### Image-Based Testing
+### Cross-IDE Comparison Test
 
 ```python
-def test_image_detection(self, cursor_app):
-    # Create template image first
-    cursor_app.key_combo('ctrl', 'shift', 'p')
-    region = (100, 100, 300, 200)
-    cursor_app.create_test_image(region, 'command_palette.png')
+def test_cross_ide_code_generation():
+    ides = ["cursor", "windsurf", "vscode"]
+    prompt = "Create a REST API endpoint for user management"
+    results = {}
 
-    # Later, find and click the image
-    found = cursor_app.click_image('test_images/command_palette.png')
-    assert found, "Command palette should be found and clicked"
-```
+    for ide_name in ides:
+        ide = create_ide_automation(ide_name)
+        ide.launch_app()
 
-## 🔄 CI/CD Integration
+        # Test with each available model
+        for model in ide.get_ai_models():
+            ide.switch_ai_model(model)
+            ide.trigger_ai_completion(prompt)
+            response = ide.get_ai_response()
 
-The framework includes GitHub Actions workflow (`.github/workflows/test.yml`):
+            results[f"{ide_name}_{model}"] = {
+                "response": response,
+                "quality_score": evaluate_code_quality(response),
+                "response_time": measure_response_time()
+            }
 
-- **Multi-Python Testing**: Tests on Python 3.11, 3.12, 3.13
-- **Automated Benchmarking**: Daily performance monitoring
-- **Artifact Collection**: Screenshots, reports, and benchmark data
-- **PR Comments**: Automatic benchmark result reporting
+        ide.close_app()
 
-### Manual CI Setup
-
-```bash
-# Local CI simulation
-xvfb-run -a --server-args="-screen 0 1920x1080x24 -ac +extension GLX" \
-    python -m pytest tests/ -v
+    # Compare results across IDEs
+    generate_comparison_report(results)
 ```
 
 ## 📊 Reports and Output
 
-### HTML Reports
+### Cross-IDE Comparison Reports
 
-- `reports/basic-report.html` - Basic functionality results
-- `reports/performance-report.html` - Performance benchmarks
-- `reports/workflow-report.html` - User workflow results
-- `htmlcov/index.html` - Code coverage report
+- `reports/cross-ide-comparison.html` - Comprehensive IDE/model comparison
+- `reports/model-performance-matrix.html` - Performance matrix across all combinations
+- `reports/workflow-efficiency.html` - Task-specific IDE/model recommendations
 
-### JSON Data Files
+### Individual IDE Reports
 
-- `benchmark_results.json` - Startup time data
-- `memory_benchmark.json` - Memory usage data
-- `cpu_benchmark.json` - CPU utilization data
-- `file_operations_benchmark.json` - File operation performance
+- `reports/cursor-benchmark.html` - Cursor IDE specific results
+- `reports/windsurf-benchmark.html` - Windsurf IDE specific results
+- `reports/vscode-benchmark.html` - VSCode specific results
 
-### Screenshots
+### Raw Data
 
-- Automatically captured during test execution
-- Stored in `screenshots/` directory
-- Named with timestamps and test context
+- `results/benchmark_data.json` - Complete benchmark dataset
+- `results/response_times.csv` - Response time measurements
+- `results/quality_scores.csv` - Code quality assessments
+
+## 🔄 CI/CD Integration
+
+The framework includes GitHub Actions for continuous benchmarking:
+
+```yaml
+# .github/workflows/cross-ide-benchmark.yml
+name: Cross-IDE AI Model Benchmark
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ide: [cursor, windsurf, vscode]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .[test]
+
+      - name: Run IDE benchmarks
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          xvfb-run python scripts/run_tests.py --ide ${{ matrix.ide }} --all-models
+
+      - name: Upload results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results-${{ matrix.ide }}
+          path: reports/
+```
+
+## 🚀 Getting Started Guide
+
+### 1. Quick Setup for Cursor vs VSCode Comparison
+
+```bash
+# Install the framework
+git clone https://github.com/ImBIOS/ide-ai-benchmark.git
+cd ide-ai-benchmark
+pip install -e .[test]
+
+# Set up API keys
+export OPENAI_API_KEY="your-key"
+export ANTHROPIC_API_KEY="your-key"
+
+# Run comparison
+python scripts/run_tests.py --ide cursor,vscode --models claude-3.5-sonnet,github-copilot --quick
+```
+
+### 2. Full Multi-IDE Benchmark
+
+```bash
+# Download and set up all IDEs
+./scripts/setup_ides.sh
+
+# Run comprehensive benchmark
+python scripts/run_tests.py --all-ides --all-models --comprehensive
+
+# Generate reports
+python scripts/generate_reports.py --cross-ide-analysis
+```
 
 ## 🐛 Troubleshooting
 
-### Common Issues
+### IDE-Specific Issues
 
-1. **Cursor application not found**
-
+1. **Cursor not launching**
    ```bash
-   export CURSOR_PATH="/correct/path/to/cursor"
+   export CURSOR_PATH="/correct/path/to/cursor.AppImage"
+   chmod +x cursor.AppImage
    ```
 
-2. **AI model API key issues**
-
+2. **VSCode Copilot not working**
    ```bash
-   # Check API key configuration
-   export OPENAI_API_KEY="your-actual-key"
-   export ANTHROPIC_API_KEY="your-actual-key"
+   code --install-extension GitHub.copilot
+   # Authenticate Copilot in VSCode
    ```
 
-3. **Display issues in headless mode**
-
+3. **Windsurf configuration**
    ```bash
-   Xvfb :99 -screen 0 1920x1080x24 &
-   export DISPLAY=:99
+   # Check Windsurf installation
+   ./windsurf.AppImage --version
    ```
 
-4. **Model response timeout**
-
-   ```bash
-   # Increase timeout in configuration
-   # Check network connectivity and API limits
-   ```
-
-### Debug Mode
+### API Key Issues
 
 ```bash
-# Run with verbose output
-pytest tests/ -v -s
+# Verify API keys
+python scripts/verify_api_keys.py
 
-# Enable debug logging
-export PYTHONPATH=$PYTHONPATH:src
+# Test model access
 python -c "
-import logging
-logging.basicConfig(level=logging.DEBUG)
-from cursor_automation import CursorAutomation
-app = CursorAutomation()
-app.launch_app()
+from ide_automation import create_ide_automation
+ide = create_ide_automation('cursor')
+print(ide.get_ai_models())
 "
 ```
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+We welcome contributions to expand IDE and model support!
 
-### Development Setup
+### Adding New IDEs
 
-```bash
-# Set up development environment
-python -m venv venv
-source venv/bin/activate
+1. Create a new class inheriting from `IDEAutomation`
+2. Implement all abstract methods
+3. Add configuration in `config/ide_configs.yml`
+4. Create tests in `tests/test_ide_functionality.py`
 
-# Install in development mode with test dependencies
-pip install -e .[test]
+### Adding New AI Models
 
-# Or using uv
-uv sync --extra test
-
-# Run linting (install dev tools first)
-pip install black flake8
-black src/ tests/
-flake8 src/ tests/
-
-# Run tests with coverage
-pytest --cov=src tests/
-```
+1. Update model lists in IDE classes
+2. Implement model switching logic
+3. Add API integration if needed
+4. Update documentation
 
 ## 📝 License
 
@@ -392,19 +524,18 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📞 Support
 
 - **Issues**: Use GitHub Issues for bug reports and feature requests
-- **Discussions**: GitHub Discussions for general questions
-- **Email**: [Your email for direct support]
+- **Discussions**: GitHub Discussions for questions and ideas
+- **Email**: Contact for enterprise support
 
-## 🚀 Future Enhancements
+## 🚀 Roadmap
 
-- [ ] Support for more AI models (Gemini, Anthropic Claude variants, local models)
-- [ ] Multi-language programming benchmarks (Python, JS, Go, Rust, etc.)
-- [ ] Complex project scenario testing (microservices, full-stack apps)
-- [ ] AI model cost-effectiveness analysis
-- [ ] Real-time leaderboard and ranking system
-- [ ] Integration with popular development workflows
-- [ ] Automated benchmark report generation and sharing
+- [ ] **IDE Support**: JetBrains IDEs, Sublime Text, Vim/Neovim
+- [ ] **Model Support**: Local models (Ollama), CodeLlama, StarCoder
+- [ ] **Advanced Metrics**: Code security analysis, performance benchmarks
+- [ ] **Real-time Dashboard**: Live benchmark results and leaderboards
+- [ ] **Custom Scenarios**: Industry-specific benchmark suites
+- [ ] **Integration**: Slack/Discord notifications, webhook support
 
 ---
 
-**Happy Benchmarking!** 🚀
+**Start benchmarking your AI coding assistants today!** 🚀

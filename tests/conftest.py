@@ -1,174 +1,124 @@
-import logging
 import os
 import sys
-import time
-from typing import Generator
 
 import pytest
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from cursor_automation import CursorAutomation
-
-# Configure test logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
-
-# Global app instance to prevent multiple launches
-_app_instance = None
+from ide_automation import create_ide_automation
 
 
 @pytest.fixture(scope="session")
-def cursor_app_session(request) -> Generator[CursorAutomation, None, None]:
-    """Session-scoped fixture that launches Cursor once for all tests"""
-    global _app_instance
-
-    if _app_instance is None:
-        logger.info("=== LAUNCHING CURSOR FOR TEST SESSION ===")
-
-        # Get cursor path from command line if provided
-        cursor_path = request.config.getoption("--cursor-path")
-        _app_instance = CursorAutomation(appimage_path=cursor_path)
-
-        logger.info(f"Using Cursor AppImage: {_app_instance.appimage_path}")
-
-        # Try to launch with extended timeout
-        success = _app_instance.launch_app(timeout=30)
-        if not success:
-            logger.error("Failed to launch Cursor for test session")
-            pytest.exit("Could not launch Cursor AppImage")
-
-        logger.info("=== CURSOR SESSION READY ===")
-
-    yield _app_instance
-
-    # Cleanup at end of session
-    if _app_instance:
-        logger.info("=== CLOSING CURSOR SESSION ===")
-        _app_instance.close_app()
-        _app_instance = None
+def ide_name(request):
+    """Get IDE name from command line or default to cursor"""
+    return request.config.getoption("--ide", default="cursor")
 
 
-@pytest.fixture
-def cursor_app(cursor_app_session) -> Generator[CursorAutomation, None, None]:
-    """Function-scoped fixture that provides a clean app state for each test"""
-    app = cursor_app_session
+@pytest.fixture(scope="session")
+def ide_app(ide_name):
+    """Fixture to provide IDE automation instance for the session"""
+    app = create_ide_automation(ide_name)
 
-    # Reset to clean state before each test
-    logger.info(f"=== PREPARING TEST: {pytest.current_test_name} ===")
-
-    # Focus window
-    app.focus_window()
-    time.sleep(0.5)
-
-    # Close any open dialogs/menus
-    for _ in range(3):
-        app.key_combo("escape")
-        time.sleep(0.1)
-
-    # Close all tabs except one
-    app.key_combo("ctrl", "shift", "w")  # Close all tabs
-    time.sleep(0.5)
-
-    # Open a new file to have clean state
-    app.key_combo("ctrl", "n")
-    time.sleep(0.5)
+    # Launch the IDE
+    assert app.launch_app(), f"Failed to launch {ide_name} IDE"
 
     yield app
 
-    # Cleanup after each test
-    logger.info(f"=== CLEANING UP TEST: {pytest.current_test_name} ===")
-
-    # Take screenshot for debugging if test failed
-    if hasattr(pytest, "failed") and pytest.failed:
-        screenshot_name = f"failed_{pytest.current_test_name}_{int(time.time())}.png"
-        app.take_screenshot(screenshot_name)
-        logger.error(f"Test failed - screenshot saved: {screenshot_name}")
-
-    # Close any dialogs
-    for _ in range(3):
-        app.key_combo("escape")
-        time.sleep(0.1)
-
-    # Close all tabs
-    app.key_combo("ctrl", "shift", "w")
-    time.sleep(0.5)
+    # Cleanup
+    app.close_app()
 
 
-@pytest.fixture(autouse=True)
-def setup_test_info(request):
-    """Auto-used fixture to set current test name for logging"""
-    pytest.current_test_name = request.node.name
-    logger.info(f"STARTING TEST: {request.node.name}")
-
-    yield
-
-    logger.info(f"COMPLETED TEST: {request.node.name}")
+@pytest.fixture
+def ide_focused(ide_app):
+    """Fixture to ensure IDE window is focused for each test"""
+    ide_app.focus_window()
+    yield ide_app
 
 
-def pytest_sessionstart(session):
-    """Called after the Session object has been created"""
-    logger.info("=== PYTEST SESSION STARTING ===")
+@pytest.fixture(params=["cursor", "windsurf", "vscode"])
+def multi_ide_app(request):
+    """Fixture for testing across multiple IDEs"""
+    ide_name = request.param
 
-    # Create necessary directories
-    os.makedirs("screenshots", exist_ok=True)
-    os.makedirs("test_images", exist_ok=True)
-    os.makedirs("reports", exist_ok=True)
+    # Skip if IDE is not available
+    try:
+        app = create_ide_automation(ide_name)
+        if not app.launch_app():
+            pytest.skip(f"{ide_name} IDE not available or failed to launch")
+    except Exception as e:
+        pytest.skip(f"{ide_name} IDE not supported: {e}")
 
-
-def pytest_sessionfinish(session, exitstatus):
-    """Called after whole test run finished"""
-    logger.info(f"=== PYTEST SESSION FINISHED (exit status: {exitstatus}) ===")
-
-
-def pytest_runtest_setup(item):
-    """Called before each test item is run"""
-    logger.info(f"Setting up test: {item.name}")
+    yield app
+    app.close_app()
 
 
-def pytest_runtest_teardown(item, nextitem):
-    """Called after each test item is run"""
-    logger.info(f"Tearing down test: {item.name}")
+@pytest.fixture
+def ai_models(ide_app):
+    """Fixture to get available AI models for the current IDE"""
+    return ide_app.get_ai_models()
 
 
-def pytest_runtest_makereport(item, call):
-    """Called after each test phase (setup, call, teardown)"""
-    if call.when == "call":
-        # Mark if test failed for screenshot capture
-        if call.excinfo is not None:
-            pytest.failed = True
-        else:
-            pytest.failed = False
+def pytest_addoption(parser):
+    """Add command line options for IDE selection"""
+    parser.addoption(
+        "--ide",
+        action="store",
+        default="cursor",
+        help="IDE to test (cursor, windsurf, vscode, etc.)",
+        choices=["cursor", "windsurf", "vscode"]
+    )
+
+    parser.addoption(
+        "--model",
+        action="store",
+        default=None,
+        help="AI model to test (claude-3.5-sonnet, gpt-4, etc.)"
+    )
+
+    parser.addoption(
+        "--headless",
+        action="store_true",
+        default=False,
+        help="Run in headless mode"
+    )
 
 
-# Configure pytest markers
 def pytest_configure(config):
-    """Configure pytest markers"""
+    """Configure pytest with custom markers"""
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line("markers", "integration: marks tests as integration tests")
-    config.addinivalue_line("markers", "unit: marks tests as unit tests")
+    config.addinivalue_line(
+        "markers", "cursor: marks tests specific to Cursor IDE"
+    )
+    config.addinivalue_line(
+        "markers", "windsurf: marks tests specific to Windsurf IDE"
+    )
+    config.addinivalue_line(
+        "markers", "vscode: marks tests specific to VSCode"
+    )
+    config.addinivalue_line(
+        "markers", "cross_ide: marks tests that run across multiple IDEs"
+    )
+    config.addinivalue_line(
+        "markers", "ai_model: marks tests that test AI model functionality"
+    )
 
 
-# Add custom command line options
-def pytest_addoption(parser):
-    """Add custom command line options"""
-    parser.addoption(
-        "--cursor-path",
-        action="store",
-        help="Path to Cursor AppImage (auto-detected if not specified)",
-    )
-    parser.addoption(
-        "--keep-cursor-open",
-        action="store_true",
-        help="Keep Cursor open after tests finish",
-    )
-    parser.addoption(
-        "--no-screenshots",
-        action="store_true",
-        help="Disable screenshot capture for failed tests",
-    )
+def pytest_collection_modifyitems(config, items):
+    """Modify test collection based on command line options"""
+    ide_name = config.getoption("--ide")
+
+    # Add IDE-specific markers
+    for item in items:
+        if ide_name in item.nodeid.lower():
+            item.add_marker(getattr(pytest.mark, ide_name))
+
+        # Mark tests that use multi_ide_app fixture as cross_ide
+        if "multi_ide_app" in item.fixturenames:
+            item.add_marker(pytest.mark.cross_ide)
+
+        # Mark tests that test AI functionality
+        if any(keyword in item.name.lower() for keyword in ["ai", "model", "completion", "chat"]):
+            item.add_marker(pytest.mark.ai_model)
